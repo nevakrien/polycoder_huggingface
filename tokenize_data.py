@@ -98,7 +98,7 @@ def tokenize_text(params):
 
         pad_length=max_len - len(chunks[-1])
         mask[-1]=np.concatenate([np.ones(len(chunks[-1])),np.zeros(pad_length,dtype=np.bool_)])
-        chunks[-1] = chunks[-1] + [1]*pad_length
+        chunks[-1] = chunks[-1] + [-100]*pad_length
 
         pygments_len=len(list(pygments.lex(text, lexer)))
         return chunks,mask,pygments_len

@@ -20,23 +20,10 @@ class TextDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         x=self.tokens[idx]
+        x[x==-100]=0 #pading
         mask=self.mask[idx]
         return {'input_ids': x, 'labels': x, 'attention_mask': mask}
 
-# def compute_metrics(eval_pred):
-#     logits, labels = eval_pred.predictions[0],eval_pred.label_ids
-    
-#     logits=torch.Tensor(logits)
-#     logits=logits.view([-1,logits.shape[-1]])
-#     labels=torch.LongTensor(labels)
-#     labels=labels.view([-1])
-    
-#     predictions = np.argmax(logits, axis=-1)
-#     accuracy = (predictions == labels).double().mean()
-    
-#     cross=cross_entropy(logits,labels,reduction='sum')
-
-#     return {"accuracy": accuracy,'raw':cross}
 
 def preprocess_logits_for_metrics(logits,labels):
 	#we are just implementing the upstairs commented out function in a more effishent way
@@ -46,10 +33,15 @@ def preprocess_logits_for_metrics(logits,labels):
 	logits=logits[0] #we get a random tuple with this idk why
 	#print(logits.shape)
 	#print(labels.shape)
+	
 	logits=logits.view([-1,logits.shape[-1]])
 	labels=labels.view([-1])
 
-	return cross_entropy(logits,labels,reduction='sum')[None]
+	mask=labels!=-100 
+	logits=logits[mask]
+	labels=labels[mask]
+
+	return cross_entropy(logits,labels,reduction='sum').reshape([1,1])
 
 def compute_metrics(eval_pred):
 	cross=eval_pred.predictions[0] #bad naming because of the hack
