@@ -5,6 +5,8 @@ from transformers import GPTNeoXForCausalLM, GPTNeoXConfig, Trainer, TrainingArg
 from torch.optim import AdamW
 from transformers import get_cosine_with_hard_restarts_schedule_with_warmup
 
+from torch.nn.functional import cross_entropy
+
 import os
 import json
 
@@ -21,15 +23,41 @@ class TextDataset(torch.utils.data.Dataset):
         mask=self.mask[idx]
         return {'input_ids': x, 'labels': x, 'attention_mask': mask}
 
+# def compute_metrics(eval_pred):
+#     logits, labels = eval_pred.predictions[0],eval_pred.label_ids
+    
+#     logits=torch.Tensor(logits)
+#     logits=logits.view([-1,logits.shape[-1]])
+#     labels=torch.LongTensor(labels)
+#     labels=labels.view([-1])
+    
+#     predictions = np.argmax(logits, axis=-1)
+#     accuracy = (predictions == labels).double().mean()
+    
+#     cross=cross_entropy(logits,labels,reduction='sum')
+
+#     return {"accuracy": accuracy,'raw':cross}
+
+def preprocess_logits_for_metrics(logits,labels):
+	#we are just implementing the upstairs commented out function in a more effishent way
+	#check the readme to see why this is made so oddly 
+
+	#print('preprocess')
+	logits=logits[0] #we get a random tuple with this idk why
+	#print(logits.shape)
+	#print(labels.shape)
+	logits=logits.view([-1,logits.shape[-1]])
+	labels=labels.view([-1])
+
+	return cross_entropy(logits,labels,reduction='sum')[None]
+
 def compute_metrics(eval_pred):
-    logits, labels = eval_pred
-    #predictions = np.argmax(logits, axis=-1)
-    #accuracy = (predictions == labels).mean()
-    return {"lol": 0}
+	cross=eval_pred.predictions[0] #bad naming because of the hack
+	return {'entropy':cross.sum()}
 
 def main(args):
 		config = GPTNeoXConfig.from_pretrained(args.config)
-		model = GPTNeoXForCausalLM(config)
+		model = GPTNeoXForCausalLM(config)#.to('cuda')
 
 		train_data = np.load(os.path.join(args.data_dir, 'train_tokens.npz'))
 		test_data = np.load(os.path.join(args.data_dir, 'test_tokens.npz'))
@@ -45,9 +73,10 @@ def main(args):
 		    per_device_train_batch_size=args.batch_size,
 		    num_train_epochs=args.epochs,
 		    save_strategy="epoch",
-		    evaluation_strategy="steps",
+		    evaluation_strategy="epoch",
 		    eval_steps=args.eval_interval,
-		    logging_dir='./logs'
+		    logging_dir='./logs',
+		    eval_accumulation_steps=1,
 		)
 
 		trainer = Trainer(
@@ -56,6 +85,7 @@ def main(args):
 		    train_dataset=train_dataset,
 		    eval_dataset=test_dataset,
 		    compute_metrics=compute_metrics,
+		    preprocess_logits_for_metrics=preprocess_logits_for_metrics,
 		    optimizers=(optimizer, scheduler)
 		)
 
