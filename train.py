@@ -20,17 +20,17 @@ class TextDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         x=self.tokens[idx]
-        x[x==-100]=0 #pading
+        labels=x.copy()
         mask=self.mask[idx]
-        return {'input_ids': x, 'labels': x, 'attention_mask': mask}
-
+        x[x==-100]=0 #pading
+        return {'input_ids': x, 'labels': labels, 'attention_mask': mask}
 
 def preprocess_logits_for_metrics(logits,labels):
-	#we are just implementing the upstairs commented out function in a more effishent way
 	#check the readme to see why this is made so oddly 
 
 	#print('preprocess')
 	logits=logits[0] #we get a random tuple with this idk why
+	#print(logits.device) #cuda
 	#print(logits.shape)
 	#print(labels.shape)
 	
@@ -63,7 +63,10 @@ def main(args):
 		training_args = TrainingArguments(
 		    output_dir=args.save_dir,
 		    per_device_train_batch_size=args.batch_size,
-		    num_train_epochs=args.epochs,
+		    num_train_epochs=float('inf'),
+		    max_steps=args.training_steps,
+		    #num_train_epochs=args.epochs,
+		    #num_training_steps=args.training_steps,
 		    save_strategy="epoch",
 		    evaluation_strategy="epoch",
 		    eval_steps=args.eval_interval,
@@ -93,7 +96,7 @@ if __name__ == '__main__':
 	parser.add_argument('--batch_size', type=int, default=262144, help="Big batch sizes are allowed (total #tokens per batch)")
 
 	parser.add_argument('--lr', type=float, default=0.00016, help="Learning rate for the optimizer")
-	parser.add_argument('--epochs', type=int, default=5, help="Number of epochs to train")
+	#parser.add_argument('--epochs', type=int, default=3, help="Number of epochs to train")
 	parser.add_argument('--save_interval', type=int, default=1, help="Interval to save model checkpoints")
 	parser.add_argument('--eval_interval', type=int, default=1, help="Interval to evaluate the model on test data")
 	parser.add_argument('--warmup_steps', type=int, default=1600, help="Number of warmup steps")
