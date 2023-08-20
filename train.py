@@ -8,6 +8,7 @@ from transformers import get_cosine_with_hard_restarts_schedule_with_warmup
 from torch.nn.functional import cross_entropy
 
 import os
+from os.path import join
 import json
 
 class TextDataset(torch.utils.data.Dataset):
@@ -51,6 +52,12 @@ def main(args):
 		config = GPTNeoXConfig.from_pretrained(args.config)
 		model = GPTNeoXForCausalLM(config)#.to('cuda')
 
+		
+		if args.checkpoint and not args.resume:
+			checkpoint = torch.load(join(args.checkpoint,'pytorch_model.bin'))
+			model.load_state_dict(checkpoint)
+			
+
 		train_data = np.load(os.path.join(args.data_dir, 'train_tokens.npz'))
 		test_data = np.load(os.path.join(args.data_dir, 'test_tokens.npz'))
 		train_dataset = TextDataset(train_data)
@@ -83,8 +90,11 @@ def main(args):
 		    preprocess_logits_for_metrics=preprocess_logits_for_metrics,
 		    optimizers=(optimizer, scheduler)
 		)
-
-		trainer.train()
+		if args.checkpoint and args.resume:
+			print('resuming')
+			trainer.train(args.checkpoint)
+		else:
+			trainer.train()
 		trainer.evaluate()
 
 if __name__ == '__main__':
@@ -94,6 +104,10 @@ if __name__ == '__main__':
 	parser.add_argument('--data_dir', type=str, required=True, help="Directory containing the train and test data")
 	parser.add_argument('--save_dir', type=str, required=True, help="Directory to save model checkpoints")
 	parser.add_argument('--batch_size', type=int, default=262144, help="Big batch sizes are allowed (total #tokens per batch)")
+
+
+	parser.add_argument('--checkpoint', type=str,default=None, help="Huggingface checkpoint folder")
+	parser.add_argument('--resume',action='store_true', default=False, help="whether to resume training or load the checkpoint")
 
 	parser.add_argument('--lr', type=float, default=0.00016, help="Learning rate for the optimizer")
 	#parser.add_argument('--epochs', type=int, default=3, help="Number of epochs to train")
